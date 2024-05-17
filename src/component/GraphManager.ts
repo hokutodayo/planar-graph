@@ -5,6 +5,7 @@ import { Edge } from "../object/Edge";
 import { Point } from "../object/Point";
 import { Vertex } from "../object/Vertex";
 import { DegreeSequence } from "./DegreeSequence";
+import { GraphIO } from "./GraphIO";
 import { ActionType, HistoryManager } from "./HistoryManager";
 
 // ============================================================================
@@ -69,15 +70,15 @@ export class GraphManager {
 	private draggingPoint: Point | null = null;
 	private activeEdge: Edge | null = null;
 	// ズーム機能関連
-	private origin: { x: number; y: number } = { x: 0, y: 0 };
-	private scale: number = 1;
-	private zoomLevels: number[] = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.75, 2.0, 2.5, 3.0, 3.5, 4.0];
-	private currentZoomIndex: number = this.zoomLevels.indexOf(1.0);
+	public origin: { x: number; y: number } = { x: 0, y: 0 };
+	public scale: number = 1;
+	public zoomLevels: number[] = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.75, 2.0, 2.5, 3.0, 3.5, 4.0];
+	public currentZoomIndex: number = this.zoomLevels.indexOf(1.0);
 	// パン機能
 	private isDragging = false;
 	private lastPos = { x: 0, y: 0 };
 	// コールバック関数
-	private updateDegreeSequence: (vertices: Vertex[], edges: Edge[]) => void;
+	public updateDegreeSequence: (vertices: Vertex[], edges: Edge[]) => void;
 	private updateInfo: (info: GraphInfo) => void;
 	// 頂点情報表示
 	private showIndex: boolean = true;
@@ -85,6 +86,8 @@ export class GraphManager {
 	// オブジェクト操作
 	private canTransForm: boolean = true;
 	private canAddRemove: boolean = true;
+	// 保存読込処理
+	private graphIO: GraphIO;
 
 	constructor(canvas: HTMLCanvasElement, updateDegreeSequence: (vertices: Vertex[], edges: Edge[]) => void, updateInfo: (info: GraphInfo) => void) {
 		this.canvas = canvas;
@@ -93,6 +96,7 @@ export class GraphManager {
 		this.updateInfo = updateInfo;
 		this.setupEvents();
 		this.resizeCanvas();
+		this.graphIO = new GraphIO(this);
 	}
 
 	// ============================================================================
@@ -691,7 +695,7 @@ export class GraphManager {
 	}
 
 	// グラフ描画
-	private drawGraph(): void {
+	public drawGraph(): void {
 		this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 		this.ctx.save();
 		this.ctx.translate(this.origin.x, this.origin.y);
@@ -823,44 +827,12 @@ export class GraphManager {
 	// ============================================================================
 	// グラフの状態をJSONとして保存
 	public saveToJson(): string {
-		const saveData = {
-			vertices: this.vertices.map((vertex, index) => ({
-				id: index,
-				x: vertex.x,
-				y: vertex.y,
-			})),
-			edges: this.edges.map((edge) => ({
-				from: this.vertices.indexOf(edge.from),
-				to: this.vertices.indexOf(edge.to),
-				control: {
-					x: edge.control.x,
-					y: edge.control.y,
-				},
-			})),
-			origin: { x: this.origin.x, y: this.origin.y },
-			scale: this.scale,
-		};
-		return JSON.stringify(saveData);
+		return this.graphIO.saveToJson();
 	}
 
 	// JSONからグラフの状態をロード
 	public loadFromJson(jsonString: string): void {
-		const loadData = JSON.parse(jsonString);
-		this.vertices = loadData.vertices.map((vData: any) => new Vertex(vData.x, vData.y));
-		this.edges = loadData.edges.map((eData: any) => {
-			const fromVertex = this.vertices[eData.from];
-			const toVertex = this.vertices[eData.to];
-			const edge = new Edge(fromVertex, toVertex);
-			edge.control.x = eData.control.x;
-			edge.control.y = eData.control.y;
-			return edge;
-		});
-		this.origin = loadData.origin;
-		this.scale = loadData.scale;
-		this.currentZoomIndex = this.zoomLevels.indexOf(loadData.scale);
-		// 次数配列の更新
-		this.updateDegreeSequence(this.vertices, this.edges);
-		this.drawGraph();
+		this.graphIO.loadFromJson(jsonString);
 	}
 
 	// ============================================================================
