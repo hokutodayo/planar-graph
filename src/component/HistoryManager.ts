@@ -9,6 +9,7 @@ export interface Action {
 	type: ActionType;
 	target: Vertex | Edge;
 	index: number;
+	oldPosition?: { x: number; y: number }; // 移動前の座標（Move時に使用）
 }
 
 // 実行グループのインターフェース
@@ -23,6 +24,7 @@ export interface GroupedAction {
 export enum ActionType {
 	Add = "add",
 	Delete = "delete",
+	Move = "move",
 }
 
 // ============================================================================

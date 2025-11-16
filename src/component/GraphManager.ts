@@ -69,6 +69,7 @@ export class GraphManager {
 	private selectedEdges: Edge[] = [];
 	private draggingPoint: Point | null = null;
 	private activeEdge: Edge | null = null;
+	private dragStartPosition: { x: number; y: number } | null = null;
 	// ズーム機能関連
 	public origin: { x: number; y: number } = { x: 0, y: 0 };
 	public scale: number = 1;
@@ -188,6 +189,7 @@ export class GraphManager {
 		// 制御点の場合（ペジェ曲線の場合、選択可能）
 		if (control && this.edgeDrawing === EdgeDrawingEnum.bezierCurve) {
 			// ドラッグ開始
+			this.dragStartPosition = { x: control.x, y: control.y };
 			this.draggingPoint = control;
 		}
 		// 頂点の場合
@@ -213,6 +215,7 @@ export class GraphManager {
 			this.canvas.style.cursor = "crosshair";
 
 			// ドラッグ開始
+			this.dragStartPosition = { x: vertex.x, y: vertex.y };
 			this.draggingPoint = vertex;
 		}
 		// 辺の場合
@@ -240,10 +243,38 @@ export class GraphManager {
 
 	// マウスアップ
 	private handleMouseUp(e: MouseEvent): void {
+		// 移動があった場合、履歴に追加
+		if (this.draggingPoint && this.dragStartPosition) {
+			const hasMoved = this.draggingPoint.x !== this.dragStartPosition.x || this.draggingPoint.y !== this.dragStartPosition.y;
+			if (hasMoved) {
+				if (this.draggingPoint instanceof Vertex) {
+					this.historyManager.addAction({
+						type: ActionType.Move,
+						target: this.draggingPoint,
+						index: this.vertices.indexOf(this.draggingPoint),
+						oldPosition: this.dragStartPosition
+					});
+				} else if (this.draggingPoint instanceof Control) {
+					// 制御点が属するエッジを見つける
+					const edgeIndex = this.edges.findIndex(e => e.control === this.draggingPoint);
+					if (edgeIndex !== -1) {
+						const edge = this.edges[edgeIndex];
+						this.historyManager.addAction({
+							type: ActionType.Move,
+							target: edge,
+							index: edgeIndex,
+							oldPosition: this.dragStartPosition
+						});
+					}
+				}
+			}
+		}
+
 		if (this.draggingPoint instanceof Control) {
 			// バウンディングボックスの再算出
 		}
 		this.draggingPoint = null;
+		this.dragStartPosition = null;
 		this.isDragging = false;
 		this.drawGraph();
 	}
@@ -507,6 +538,13 @@ export class GraphManager {
 							this.addEdge(edge, action.index);
 						});
 						break;
+					case ActionType.Move:
+						// 移動を戻す
+						if (action.oldPosition) {
+							vertex.x = action.oldPosition.x;
+							vertex.y = action.oldPosition.y;
+						}
+						break;
 				}
 			} else if (action.target instanceof Edge) {
 				// 辺ActionのUndo
@@ -517,6 +555,14 @@ export class GraphManager {
 						break;
 					case ActionType.Delete:
 						this.addEdge(edge, action.index);
+						break;
+					case ActionType.Move:
+						// 制御点の移動を戻す
+						if (action.oldPosition) {
+							edge.control.x = action.oldPosition.x;
+							edge.control.y = action.oldPosition.y;
+						}
+						break;
 				}
 			}
 		});
@@ -550,6 +596,11 @@ export class GraphManager {
 					case ActionType.Delete:
 						this.deleteVertex(vertex);
 						break;
+					case ActionType.Move:
+						// TODO: 移動を再実行
+						// 移動履歴を保存する際に、移動前の情報しか保持していないため、redoができない
+						// 移動後の情報も保存するように変更する必要がある
+						break;
 				}
 			} else if (action.target instanceof Edge) {
 				// 辺ActionのRedo
@@ -560,12 +611,17 @@ export class GraphManager {
 						break;
 					case ActionType.Delete:
 						this.deleteEdge(edge);
+						break;
+					case ActionType.Move:
+						// 制御点の移動を再実行
+						// 移動済みなので処理不要
+						break;
 				}
 			}
 		});
 
 		// 次数配列の更新
-
+		this.updateDegreeSequence(this.vertices, this.edges);
 		this.drawGraph();
 	}
 
