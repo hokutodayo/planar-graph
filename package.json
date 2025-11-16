@@ -16,12 +16,12 @@
 		"nodemon": "^3.1.0",
 		"ts-loader": "^9.5.1",
 		"typescript": "^5.4.5",
-		"webpack": "^5.91.0",
+		"webpack": "^5.102.1",
 		"webpack-cli": "^5.1.4",
-		"webpack-dev-server": "^5.0.4"
+		"webpack-dev-server": "^5.2.2"
 	},
 	"dependencies": {
 		"d3": "^7.9.0",
-		"sweetalert2": "^11.10.8"
+		"sweetalert2": "^11.26.3"
 	}
 }
